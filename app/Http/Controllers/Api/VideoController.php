@@ -7,14 +7,12 @@ use App\Models\Course;
 use App\Models\Lesson;
 use App\Models\Video;
 use App\Services\BunnyStreamService;
-use App\Services\VdoCipherService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class VideoController extends Controller
 {
     public function __construct(
-        private VdoCipherService $vdoCipher,
         private BunnyStreamService $bunny,
     ) {}
 
