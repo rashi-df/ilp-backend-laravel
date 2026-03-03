@@ -31,9 +31,17 @@ optimize_laravel() {
     echo "Laravel optimized"
 }
 
+run_migrations() {
+    cd /var/www
+    echo "Running migrations..."
+    php artisan migrate --force || true
+    echo "Migrations done"
+}
+
 fix_permissions
 check_composer
 optimize_laravel
+run_migrations
 
 echo "ILP Container Ready!"
 exec "$@"
