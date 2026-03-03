@@ -35,7 +35,8 @@ run_migrations() {
     cd /var/www
     echo "Running migrations..."
     php artisan migrate --force || true
-    echo "Migrations done"
+    php artisan db:seed --force || true
+    echo "Migrations and seeding done"
 }
 
 fix_permissions
