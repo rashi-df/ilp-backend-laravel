@@ -3,13 +3,17 @@
 namespace Database\Seeders;
 
 use App\Models\Category;
+use App\Models\Certificate;
 use App\Models\Course;
+use App\Models\Homework;
+use App\Models\HomeworkSubmission;
 use App\Models\Lesson;
 use App\Models\Module;
 use App\Models\Settings;
 use App\Models\SubscriptionPlan;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Models\UserProgress;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
@@ -262,6 +266,126 @@ class DatabaseSeeder extends Seeder
                     'currency' => 'USD',
                     'payment_method' => $data['method'],
                     'status' => $data['status'],
+                ]
+            );
+        }
+
+        // ==================== ENROLLMENTS ====================
+        $enrollmentData = [
+            [$students[0], $course1], [$students[0], $course2],
+            [$students[1], $course1], [$students[1], $course4],
+            [$students[2], $course2], [$students[2], $course3],
+            [$students[3], $course3], [$students[3], $course4],
+            [$students[4], $course1], [$students[4], $course4],
+        ];
+        foreach ($enrollmentData as [$student, $course]) {
+            \Illuminate\Support\Facades\DB::table('user_enrolled_courses')
+                ->insertOrIgnore([
+                    'user_id' => $student->id,
+                    'course_id' => $course->id,
+                    'created_at' => now()->subDays(rand(1, 30)),
+                    'updated_at' => now(),
+                ]);
+        }
+
+        // ==================== LESSON COMPLETIONS ====================
+        foreach ($enrollmentData as [$student, $course]) {
+            $progress = UserProgress::firstOrCreate(
+                ['user_id' => $student->id, 'course_id' => $course->id],
+                ['percentage' => rand(10, 90)]
+            );
+            $lessons = Lesson::whereHas('module', fn($q) => $q->where('course_id', $course->id))
+                ->take(2)->get();
+            foreach ($lessons as $lesson) {
+                \Illuminate\Support\Facades\DB::table('user_completed_lessons')
+                    ->insertOrIgnore([
+                        'user_progress_id' => $progress->id,
+                        'lesson_id' => $lesson->id,
+                        'created_at' => now()->subDays(rand(1, 20)),
+                        'updated_at' => now(),
+                    ]);
+            }
+        }
+
+        // ==================== HOMEWORK & SUBMISSIONS ====================
+        $allLessons = Lesson::all();
+        $hw1 = Homework::firstOrCreate(
+            ['title' => 'Tajweed Practice: Noon Sakinah'],
+            [
+                'lesson_id' => $allLessons->where('title', 'Noon Sakinah Rules')->first()?->id ?? $allLessons->first()->id,
+                'course_id' => $course1->id,
+                'instructions' => 'Record yourself reciting 5 verses applying Noon Sakinah rules.',
+                'submission_type' => 'audio',
+                'max_score' => 100,
+                'status' => 'published',
+            ]
+        );
+        $hw2 = Homework::firstOrCreate(
+            ['title' => 'Makharij Identification Exercise'],
+            [
+                'lesson_id' => $allLessons->where('title', 'Throat Letters')->first()?->id ?? $allLessons->first()->id,
+                'course_id' => $course2->id,
+                'instructions' => 'Identify the correct makhraj for 20 Arabic letters.',
+                'submission_type' => 'text',
+                'max_score' => 20,
+                'status' => 'published',
+            ]
+        );
+        $hw3 = Homework::firstOrCreate(
+            ['title' => 'Wudu Step-by-Step Description'],
+            [
+                'lesson_id' => $allLessons->where('title', 'Purity and Wudu')->first()?->id ?? $allLessons->first()->id,
+                'course_id' => $course4->id,
+                'instructions' => 'Write a detailed description of the steps and conditions of Wudu.',
+                'submission_type' => 'text',
+                'max_score' => 50,
+                'status' => 'published',
+            ]
+        );
+
+        $submissionData = [
+            [$students[0], $hw1, 'reviewed',  $mentor1->id, $mentor1->name, now()->subDays(5)],
+            [$students[1], $hw1, 'reviewed',  $mentor1->id, $mentor1->name, now()->subDays(4)],
+            [$students[2], $hw2, 'reviewed',  $mentor1->id, $mentor1->name, now()->subDays(3)],
+            [$students[3], $hw3, 'reviewed',  $mentor2->id, $mentor2->name, now()->subDays(2)],
+            [$students[4], $hw3, 'pending',   null,         null,           now()->subDays(1)],
+            [$students[0], $hw2, 'pending',   null,         null,           now()->subHours(6)],
+        ];
+        foreach ($submissionData as [$student, $hw, $status, $mentorId, $mentorName, $reviewedAt]) {
+            HomeworkSubmission::firstOrCreate(
+                ['homework_id' => $hw->id, 'student_id' => $student->id],
+                [
+                    'student_name'       => $student->name,
+                    'student_email'      => $student->email,
+                    'content'            => 'Submission content for ' . $hw->title,
+                    'assigned_mentor_id' => $mentorId,
+                    'mentor_name'        => $mentorName,
+                    'status'             => $status,
+                    'grade'              => $status === 'reviewed' ? rand(70, 100) : null,
+                    'feedback'           => $status === 'reviewed' ? 'Good effort, keep practicing.' : null,
+                    'submitted_at'       => now()->subDays(rand(6, 14)),
+                    'reviewed_at'        => $status === 'reviewed' ? $reviewedAt : null,
+                ]
+            );
+        }
+
+        // ==================== CERTIFICATES ====================
+        $certData = [
+            [$students[0], $course1, 'Introduction to Quran Recitation', now()->subDays(10)],
+            [$students[1], $course4, 'Fiqh of Salah',                    now()->subDays(7)],
+            [$students[2], $course2, 'Tajweed Rules Mastery',             now()->subDays(4)],
+            [$students[3], $course3, 'Hadith Sciences Foundation',        now()->subDays(2)],
+        ];
+        foreach ($certData as [$student, $course, $courseName, $issueDate]) {
+            Certificate::firstOrCreate(
+                ['student_id' => $student->id, 'course_id' => $course->id],
+                [
+                    'certificate_id' => 'CERT-' . strtoupper(substr(md5($student->id . $course->id), 0, 8)),
+                    'student_name'   => $student->name,
+                    'student_email'  => $student->email,
+                    'course_name'    => $courseName,
+                    'issue_date'     => $issueDate,
+                    'status'         => 'issued',
                 ]
             );
         }
