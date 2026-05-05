@@ -2,7 +2,7 @@ name: ilp
 
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:15-alpine
     container_name: ilp_postgres
     restart: unless-stopped
     env_file:
